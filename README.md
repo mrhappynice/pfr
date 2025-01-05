@@ -9,4 +9,4 @@
   ```bash
   python func_serv.py
   ```
-
+Connect on port 5000 (or assigned)
