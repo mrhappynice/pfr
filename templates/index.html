@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Python Function Runner</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body.light-mode {
+            background-color: #f0f0f0;
+            color: #1e1e1e;
+        }
+
+        h1, h2 {
+            color: #ddd;
+        }
+
+        .light-mode h1, .light-mode h2 {
+            color: #333;
+        }
+
+        textarea {
+            width: 80%;
+            height: 200px;
+            margin-bottom: 10px;
+            background-color: #333;
+            color: #f0f0f0;
+            border: 1px solid #555;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .light-mode textarea {
+            background-color: #fff;
+            color: #333;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 8px 15px;
+            cursor: pointer;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #4cae4c;
+        }
+
+        .light-mode button {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .light-mode button:hover {
+            background-color: #0056b3;
+        }
+
+        #output {
+            white-space: pre-wrap;
+            border: 1px solid #555;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #282828;
+            color: #f0f0f0;
+            border-radius: 5px;
+        }
+
+        .light-mode #output {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            color: #000;
+        }
+
+        .error {
+            color: #f44336;
+        }
+
+        .saved-functions {
+            margin-top: 20px;
+        }
+
+        .saved-functions button {
+            background-color: #6c757d;
+        }
+
+        .saved-functions button:hover {
+            background-color: #5a6268;
+        }
+
+        .light-mode .saved-functions button {
+            background-color: #007bff;
+        }
+
+        .light-mode .saved-functions button:hover {
+            background-color: #0056b3;
+        }
+
+        #saveFunctionDiv {
+            margin-top: 10px;
+        }
+
+        #saveFunctionDiv input[type="text"] {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: #f0f0f0;
+        }
+
+        .light-mode #saveFunctionDiv input[type="text"] {
+            background-color: #fff;
+            color: #333;
+            border: 1px solid #ccc;
+        }
+
+        #darkModeToggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #444;
+        }
+
+        .light-mode #darkModeToggle {
+            background-color: #ddd;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <button id="darkModeToggle" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    <h1>Python Function Runner</h1>
+    <textarea id="pythonCode" placeholder="Enter your Python function here..."></textarea><br>
+    <button onclick="executePython()">Run</button>
+
+    <div id="saveFunctionDiv">
+        <input type="text" id="functionName" placeholder="Save function as...">
+        <button onclick="saveFunction()">Save Function</button>
+    </div>
+
+    <h2>Output:</h2>
+    <div id="output"></div>
+
+    <div class="saved-functions">
+        <h2>Saved Functions:</h2>
+        <div id="savedFunctionList">
+            {% for func_name in saved_functions %}
+                <button onclick="loadFunction('{{ func_name }}')">{{ func_name }}</button>
+            {% else %}
+                <p>No functions saved yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        let darkMode = true; // Default to dark mode
+
+        function toggleDarkMode() {
+            const body = document.body;
+            body.classList.toggle('light-mode');
+            darkMode = !darkMode;
+        }
+
+        async function executePython() {
+            const code = document.getElementById('pythonCode').value;
+            const outputDiv = document.getElementById('output');
+            outputDiv.textContent = 'Running...';
+            outputDiv.classList.remove('error'); // Clear previous error class
+
+            const response = await fetch('/execute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `code=${encodeURIComponent(code)}`,
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                let outputText = data.output || '';
+                if (data.error) {
+                    outputText += `\n\nError:\n${data.error}`;
+                    outputDiv.classList.add('error');
+                }
+                outputDiv.textContent = outputText;
+            } else {
+                outputDiv.textContent = `Error: ${data.error || 'Something went wrong'}`;
+                outputDiv.classList.add('error');
+            }
+        }
+
+        async function saveFunction() {
+            const name = document.getElementById('functionName').value;
+            const code = document.getElementById('pythonCode').value;
+
+            if (!name.trim()) {
+                alert('Please enter a name for the function.');
+                return;
+            }
+
+            const response = await fetch('/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `name=${encodeURIComponent(name)}&code=${encodeURIComponent(code)}`,
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                alert(data.message);
+                // Reload the page to update the saved function list (simpler approach)
+                window.location.reload();
+            } else {
+                alert(`Error saving function: ${data.error}`);
+            }
+        }
+
+        async function loadFunction(functionName) {
+            const response = await fetch(`/load/${functionName}`);
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('pythonCode').value = data.code;
+            } else {
+                alert(`Error loading function: ${data.error}`);
+            }
+        }
+
+        // Set initial dark mode state
+        if (darkMode) {
+            document.body.classList.add('dark-mode');
+        }
+    </script>
+</body>
+</html>
